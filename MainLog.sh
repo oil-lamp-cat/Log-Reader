@@ -15,23 +15,56 @@ echo "프로그램을 실행합니다"
 sleep 1
 clear
 
+#log 파일
 LOG_FILE="./test.log"
 
-PREVIOUS_CONTENT=""
+#파일 변경 시간 초기화
+PREVIOUS_DATE=""
 
+#DOWN 수
 PREVIOUS_DOWN=0
 
+#UP 수
 CURRENT_DOWN=0
+
+# 알람 출력
+alarm() {
+	while true
+	do 
+		printf '\a'	
+		sleep 0.5 
+	done 
+}
+
+#소리 알람 함수
+sound_alarm() {
+
+	#alarm 함수 백그라운드 실행
+	alarm &
+
+	# alarm 함수 프로세스 ID 저장
+	alarm_process_id=$!
+
+	while read -s -n 1 input
+	do
+		if [[ $input = q ]]
+		then
+			kill $alarm_process_id
+			break
+		fi
+	done
+}
 
 #파일 변경 확인 함수
 check_file_change() {
+	#파일 존재 유무
 	if [ -f "$LOG_FILE" ]; then
 
-		#LOG_FILE 변수에 저장
-		CURRENT_CONTENT=$(< "$LOG_FILE")
+		#LOG_FILE 변경 시간을 저장
+		CURRENT_DATE=$(date -r "$LOG_FILE")
 
 		#변경 감지 : 시간을 기반으로 
-		if [ "$CURRENT_CONTENT" != "$PREVIOUS_CONTENT" ]; then
+		if [ "$CURRENT_DATE" != "$PREVIOUS_DATE" ]; then
 
 			#UP 수 확인
 			echo "UP 수 : `cat $LOG_FILE | grep -c "UP"`"
@@ -47,11 +80,11 @@ check_file_change() {
 
 			#DOWN수가 변경되었을 때 소리내기
 			if [ $CURRENT_DOWN -gt $PREVIOUS_DOWN ]; then
-				echo -e '\a'
+				sound_alarm
 			fi
 
 			PREVIOUS_DOWN=$CURRENT_DOWN
-			PREVIOUS_CONTENT=$CURRENT_CONTENT
+			PREVIOUS_DATE=$CURRENT_DATE
 		fi
 	else
 		echo "로그 파일이 없습니다"
@@ -62,12 +95,11 @@ check_file_change() {
 	fi
 }
 
-
-
+#파일 변경 메인
 while true
 do
 	check_file_change
-	sleep 0.2
+	sleep 1
 	clear
 done
 
