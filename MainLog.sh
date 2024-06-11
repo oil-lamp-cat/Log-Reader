@@ -113,7 +113,7 @@ check_file_change() {
 while true
 do
 	check_file_change
-	sleep 1
+	sleep .7
 	clear
 done
 
