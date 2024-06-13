@@ -38,7 +38,7 @@ alarm() {
 	while true
 	do 
 		printf '\a'	
-		sleep 0.5 
+		sleep 0.3
 	done 
 }
 
@@ -53,10 +53,17 @@ sound_alarm() {
 
 	while read -s -n 1 input
 	do
-		if [[ $input = q ]]
-		then
-			kill $alarm_process_id
+		if [[ $input = q ]]; then
+			if [[ $alarm_process_id !=  "" ]]; then
+				kill $alarm_process_id
+			fi
 			break
+		elif [[ $input = m ]]; then
+			kill $alarm_process_id
+			alarm_process_id=""
+			echo "알람을 종료했습니다 q를 눌러 작업을 계속할 수 있습니다"
+		else
+			echo "$input 은 잘못된 입력입니다"
 		fi
 	done
 }
@@ -90,10 +97,10 @@ check_file_change() {
 				DOWN_LOG=$(grep "DOWN" "$LOG_FILE")
 				DOWN_COUNT=$(($CURRENT_DOWN - $PREVIOUS_DOWN ))
 				echo " $PREVIOUS_DOWN -> $CURRENT_DOWN"
-				echo -e "\n========= LOG =========\n"
+				echo -e "\n========= DOWN LOG =========\n"
 				echo -e "\n$DOWN_LOG" | tail -n $DOWN_COUNT
-				echo -e "\n======================="
-				echo -e "\n알람을 종료하기 위해 q를 누르세요"
+				echo -e "\n============================"
+				echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
 				sound_alarm
 			fi
 
@@ -109,7 +116,7 @@ check_file_change() {
 	fi
 }
 
-#파일 변경 메인
+#파일 변경 메인 실행
 while true
 do
 	check_file_change
