@@ -17,8 +17,11 @@ clear
 # log 파일
 LOG_FILE="./NEW_LOG_FILE.log"
 
-# 이전 시간 저장
-PREV_TIME=0
+#파일 변경 시간 초기화
+PREVIOUS_DATE=""
+
+#로그 시작 시간 초기화, 로그에 * 가 없기에 초기 값으로 설정
+LOG_TIME="\*"
 
 # 알람 출력
 alarm() {
@@ -43,6 +46,7 @@ sound_alarm() {
             if [[ $alarm_process_id != "" ]]; then
                 kill $alarm_process_id
             fi
+            clear
             break
         elif [[ $input = m ]]; then
             kill $alarm_process_id
@@ -63,8 +67,50 @@ check_file_change(){
         sleep 1
         clear
         return
+
     fi
 
+    if [[ ! -s "$LOG_FILE" ]]; then
+        echo "파일이 비어있습니다."
+        sleep 1
+        #clear
+        return
+    fi
+
+    #파일 변경 감지 : 시간기반
+    CURRENT_DATE=$(date -r "$LOG_FILE")
+    if [ "$CURRENT_DATE" != "$PREVIOUS_DATE" ]; then
+        #시간 조정
+        PREVIOUS_DATE=$CURRENT_DATE
+        NEW_LOG=$(grep -Ev "$LOG_TIME" "$LOG_FILE")
+        echo "$NEW_LOG"
+
+        #NEW_LOG 존재 유무 확인
+        if [[ -z "$NEW_LOG" ]]; then
+            return
+        fi
+
+        #grep을 받을 때 echo를 이용해 변수에 있는 값들을 출력하고 거기서 grep을 할 것!!! grep 뒤에 그냥 쓰면 파일이름 이라서 문제 발생!!
+        if echo "$NEW_LOG" | grep -q "DOWN"; then
+            
+            #critical 감지
+            if echo "$NEW_LOG" | grep -q "CRITICAL"; then
+                echo "CRITICAL 발생"
+            fi
+
+            echo -e "\n DOWN 발생"
+            DOWN_LOG=$(echo "$NEW_LOG" | grep "DOWN")
+            echo -e "\n========= DOWN LOG =========\n"
+            echo -e "\n$DOWN_LOG"
+            echo -e "\n============================"
+            echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
+            sound_alarm
+        fi
+    
+        LOG_TIME+=$(echo "$NEW_LOG" | grep -oP '^\[\d+\]' | tr -d '[]' | sort -u | awk 'BEGIN{sep="|"} {printf "%s%s", sep, $0; sep=" | "} END{print ""}')
+    else
+        echo "변경사항 없음"
+    fi
     
 }
 
@@ -72,6 +118,6 @@ check_file_change(){
 while true
 do
     check_file_change
-    sleep 17
+    sleep 2
     clear
 done

@@ -28,10 +28,10 @@ while read -r line; do
     CURRENT_TIME=$(date -d "@$TIME_STAMP" "+%Y-%m-%d %H:%M:%S")
 
 	#test용 출력
-	#echo "============================="
-	#echo "이전 시간 : $PREV_TIME"
-	#echo "현재  시간 : $CURRENT_TIME"
-	#echo "============================="
+	echo "============================="
+	echo "이전 시간 : $PREV_TIME"
+	echo "현재  시간 : $CURRENT_TIME"
+	echo "============================="
 
     #시간변경 감지 후 새로운 로그 추가
     if [[ -n "$PREV_TIME" && "$PREV_TIME" != "$CURRENT_TIME" ]]; then
@@ -41,7 +41,7 @@ while read -r line; do
         #배열 초기화
         LINE_ARRAY=""
         #대기 시간
-        sleep 15 #$(( $PREV_TIME - $CURRENT_TIME +%S )) #으로 실제 테스트를 진행할 수 있다
+        sleep 5 #$(( $PREV_TIME - $CURRENT_TIME +%S )) #으로 실제 테스트를 진행할 수 있다
 		clear
     fi
 
