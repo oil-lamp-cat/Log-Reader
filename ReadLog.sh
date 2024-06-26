@@ -83,7 +83,6 @@ check_file_change(){
         #시간 조정
         PREVIOUS_DATE=$CURRENT_DATE
         NEW_LOG=$(grep -Ev "$LOG_TIME" "$LOG_FILE")
-        echo "$NEW_LOG"
 
         #NEW_LOG 존재 유무 확인
         if [[ -z "$NEW_LOG" ]]; then
