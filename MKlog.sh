@@ -56,4 +56,4 @@ while read -r line; do
     PREV_TIME="$CURRENT_TIME"
 done < "$LOG_FILE"
 
-echo "Log processing complete. Check the NEW_LOG_FILE.log for entries."
+echo "모든 테스트 로그가 종료되었습니다"
