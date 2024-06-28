@@ -1,4 +1,80 @@
 #!/bin/bash
+
+#옵션
+OPTIONS="f:ah?"
+
+FOLDER=0
+
+OPTION_FOLDER_PATH="./OPTION"
+
+#사용법
+usage(){
+    echo '
+    <options>
+    -a : DOWN, CRITICAL감지 - (default : DOWN만 감지)
+    -f : 폴더 위치
+    -h : 도움말
+    '
+}
+
+while getopts $OPTIONS opts; do
+    case $opts in
+    \?)
+        echo "invalid option"
+        usage
+        exit 1
+    ;;
+    a)
+        echo "모든 DOWN, CRITICAL 감지"
+        CHECK_ALL=true
+    ;;
+    f)
+        FOLDER=1
+    ;;
+    h)
+        usage
+        exit 1
+    ;;
+    esac
+done
+
+# log 파일
+if [[ $FOLDER = 0 ]]; then
+    LOG_FILE="./NEW_LOG_FILE.log"
+else
+    LOG_FILE=$(grep '^LOG_PATH : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+    if [ ! -f "$LOG_FILE" ]; then
+        echo "위치에 로그파일이 존재하지 않습니다, 다시 한번 확인해 주세요"
+        exit 1
+    fi
+fi
+#파일 변경 시간 초기화
+PREVIOUS_DATE=""
+
+#로그 시작 시간 초기화, 로그에 * 가 없기에 초기 값으로 설정
+LOG_TIME="\*"
+
+#시간 제거 로직에 필요한 변경사항에 따른 횟수 - 과부화 방지용
+TIME_FILTER_COUNTER=0
+
+#옵션 관련 -a
+CHECK_ALL=false
+
+#알람 빈도
+ALARM_REPEAT=$(grep '^ALARM_REPEAT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+
+if [ -z "$ALARM_REPEAT" ]; then
+    echo "알람 반복 변수가 비어있습니다. OPTION을 확인해주세요"
+    exit 1
+fi
+
+#로그 확인 빈도
+RDLOG_REPEAT=$(grep '^RDLOG_REPEAT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+
+if [ -z "$RDLOG_REPEAT" ]; then
+    echo "로그 확인 빈도 변수가 비어있습니다. OPTION을 확인해주세요"
+    exit 1
+fi
 echo "
 
     ██████╗ ██████╗     ██╗      ██████╗  ██████╗ 
@@ -11,24 +87,15 @@ echo "
 "
 
 echo "프로그램을 실행합니다"
-sleep 1
+sleep 2
 clear
-
-# log 파일
-LOG_FILE="./NEW_LOG_FILE.log"
-
-#파일 변경 시간 초기화
-PREVIOUS_DATE=""
-
-#로그 시작 시간 초기화, 로그에 * 가 없기에 초기 값으로 설정
-LOG_TIME="\*"
 
 # 알람 출력
 alarm() {
     while true
     do 
-        printf '\a'    
-        sleep 0.3
+        printf '\a'
+        sleep $ALARM_REPEAT
     done 
 }
 
@@ -73,13 +140,19 @@ check_file_change(){
     if [[ ! -s "$LOG_FILE" ]]; then
         echo "파일이 비어있습니다."
         sleep 1
-        #clear
+        clear
         return
     fi
 
     #파일 변경 감지 : 시간기반
     CURRENT_DATE=$(date -r "$LOG_FILE")
+    DATE=$(date +'%Y-%m-%d')
+    TIME=$(date +'%H:%M:%S')
+    echo "현재 날짜: $DATE"
+    echo "현재 시간: $TIME"
     if [ "$CURRENT_DATE" != "$PREVIOUS_DATE" ]; then
+        echo "로그 변경사항 감지"
+        TIME_FILTER_COUNTER=$((TIME_FILTER_COUNTER + 1))
         #시간 조정
         PREVIOUS_DATE=$CURRENT_DATE
         NEW_LOG=$(grep -Ev "$LOG_TIME" "$LOG_FILE")
@@ -89,34 +162,63 @@ check_file_change(){
             return
         fi
 
-        #grep을 받을 때 echo를 이용해 변수에 있는 값들을 출력하고 거기서 grep을 할 것!!! grep 뒤에 그냥 쓰면 파일이름 이라서 문제 발생!!
-        if echo "$NEW_LOG" | grep -q "DOWN"; then
-            
-            #critical 감지
-            if echo "$NEW_LOG" | grep -q "CRITICAL"; then
-                echo "CRITICAL 발생"
+        if [ $CHECK_ALL = true ]; then
+            #전체 감지
+            if echo "$NEW_LOG" | grep -qE "CRITICAL|DOWN"; then
+                if echo "$NEW_LOG" | grep -q "CRITICAL"; then
+                    echo -e "\n CRITICAL 발생"
+                fi
+                if echo "$NEW_LOG" | grep -q "DOWN"; then
+                    echo -e "\n DOWN 발생"
+                fi
+                ALL_LOG=$(echo "$NEW_LOG" | grep -E "DOWN|CRITICAL")
+                echo -e "\n========= DOWN LOG =========\n"
+                echo -e "\n$ALL_LOG"
+                echo -e "\n============================"
+                echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
+                sound_alarm
+            else
+                echo "DOWN및 CRITICAL 없음"
             fi
-
-            echo -e "\n DOWN 발생"
-            DOWN_LOG=$(echo "$NEW_LOG" | grep "DOWN")
-            echo -e "\n========= DOWN LOG =========\n"
-            echo -e "\n$DOWN_LOG"
-            echo -e "\n============================"
-            echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
-            sound_alarm
+        else
+            #grep을 받을 때 echo를 이용해 변수에 있는 값들을 출력하고 거기서 grep을 할 것!!! grep 뒤에 그냥 쓰면 파일 이름 이라서 문제 발생!!
+            if echo "$NEW_LOG" | grep -q "DOWN"; then
+                echo -e "\n DOWN 발생"
+                DOWN_LOG=$(echo "$NEW_LOG" | grep "DOWN")
+                echo -e "\n========= DOWN LOG =========\n"
+                echo -e "\n$DOWN_LOG"
+                echo -e "\n============================"
+                echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
+                sound_alarm
+            else
+                echo "DOWN 없음"
+            fi
         fi
-    
-        LOG_TIME+=$(echo "$NEW_LOG" | grep -oP '^\[\d+\]' | tr -d '[]' | sort -u | awk 'BEGIN{sep="|"} {printf "%s%s", sep, $0; sep=" | "} END{print ""}')
+
+        #이미 지난 시간 제외하기 위한 로직
+        #echo "LOG TIME 위 : $LOG_TIME"
+        #echo "NEWLOG: $NEW_LOG"
+        LOG_TIME+=$(echo "$NEW_LOG" | grep -oP '^\[\d+\]' | tr -d '[]' | sort -u | awk 'BEGIN{sep="|"} {printf "%s%s", sep, $0; sep="|"} END{print ""}')
+        #echo "LOG TIME 아래 : $LOG_TIME"
+
+        #시간 필터 - 필요시 카운트 수 바꾸면 됨, 혹시 몰라서 =이 아니라 -ge로 설정
+        if [ $TIME_FILTER_COUNTER -ge 10 ]; then
+            #echo "LOG TIME: $LOG_TIME"
+            EXIST_IN_LOG_TIME=$(head -n 1 "$LOG_FILE" | grep -oP '^\[\d+\]' | tr -d '[]')
+            #echo "exitst log time : $EXIST_IN_LOG_TIME"
+            FILTERED_LOG=$(echo "$LOG_TIME" | tr '|' '\n' | awk -v filter="$EXIST_IN_LOG_TIME" '$1 >= filter' | tr '\n' '|' | sed 's/|$//' | sed 's/ $//')
+            #echo "FILTERED LOG : $FILTERED_LOG"
+            LOG_TIME=$FILTERED_LOG
+        fi
     else
-        echo "변경사항 없음"
+        echo "로그 변경사항 없음"
     fi
-    
 }
 
 # 파일 변경 메인 실행
 while true
 do
     check_file_change
-    sleep 2
+    sleep $RDLOG_REPEAT
     clear
 done

@@ -1,7 +1,16 @@
 #!/bin/bash
 
 #테스트용 파일 (원한다면 변경 가능)
-LOG_FILE="mlat.log"
+OPTION_FOLDER_PATH="./OPTION"
+LOG_FILE=$(grep '^TEST_LOG_FILE : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+if [ -z "$LOG_FILE" ]; then
+    echo "테스트 로그 파일 변수가 비어있습니다. OPTION을 확인해주세요"
+    exit 1
+fi
+if [ ! -f "$LOG_FILE" ]; then
+    echo "위치에 테스트 로그 파일이 존재하지 않습니다, 다시 한번 확인해 주세요"
+    exit 1
+fi
 
 #테스트용으로 만들어질 파일 (변경 할 이유 없음)
 NEW_LOG_FILE="NEW_LOG_FILE.log"
@@ -27,15 +36,16 @@ while read -r line; do
 	#unix 시간 변경
     CURRENT_TIME=$(date -d "@$TIME_STAMP" "+%Y-%m-%d %H:%M:%S")
 
-	#test용 출력
-	echo "============================="
-	echo "이전 시간 : $PREV_TIME"
-	echo "현재  시간 : $CURRENT_TIME"
-	echo "============================="
+
 
     #시간변경 감지 후 새로운 로그 추가
     if [[ -n "$PREV_TIME" && "$PREV_TIME" != "$CURRENT_TIME" ]]; then
-		echo "Time change detected"
+        #test용 출력
+        echo "============================="
+        echo "이전 시간 : $PREV_TIME"
+        echo "현재  시간 : $CURRENT_TIME"
+        echo "============================="
+        echo "Time change detected"
         #파일로 한번에 저장 (\n이 존재하기에 -e를 이용)
         echo -e "$LINE_ARRAY" >> "$NEW_LOG_FILE"
         #배열 초기화
