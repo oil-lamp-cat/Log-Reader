@@ -24,7 +24,7 @@ Once you run this script for the first time, you'll get a file called OPTION, wh
 2. Keep ringing the alarm until we press `q` to confirm, for mute press `m`
 3. And thats all!
 
-![video](https://github.com/oil-lamp-cat/Log-Reader/assets/103806022/f56072cd-a305-4bb6-bd25-a536800f7d9c)
+https://github.com/oil-lamp-cat/Log-Reader/assets/103806022/f56072cd-a305-4bb6-bd25-a536800f7d9c
 
 > about OPTION
 
