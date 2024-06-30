@@ -20,11 +20,16 @@ LOG_PATH : [./mlat.log]
 #알람 출력 빈도입니다 - 기본 0.3s
 ALARM_REPEAT : [0.3]
 
-#테스트 로그 파일 위치입니다, 테스트에 쓰고 싶은 파일을 넣으시면 됩니다
+#테스트 로그에 사용될 로그 파일 위치입니다, 테스트에 쓰고 싶은 로그 파일을 넣으시면 됩니다
 TEST_LOG_FILE : [./mlat.log]
 
-#로그 읽는 빈도수 입니다 - 기본 2s
+#로그 읽는 빈도수 입니다 - 기본 2s, 2초마다 파일이 변경되었는지 확인
 RDLOG_REPEAT : [2]
+
+#시간 제외 필터 횟수입니다, 예를들어 기본 10일 때에는 로그 파일 변경이 10회 감지되고 나서야 시간 필터를 한번 검사합니다
+#검사시 로그에 삭제된 시간이 존재한다면 코드의 FILTER_LOG변수에서 그 시간대를 전부 삭제합니다
+#테스트 스크립트를 이용하였을 때에는 10회 정도가 적당하였으나 로그 읽는 빈도수, 실제 로그 생성 시간에 맞춰 알맞게 변경하시기 바랍니다
+TIME_FILTER_COUNT : [10]
     " > "$OPTION_FOLDER_PATH"
     echo "./OPTION 파일을 생성하였으니 확인하고 설정을 끝낸 뒤 다시 찾아와주세요~"
     exit 1
@@ -54,6 +59,16 @@ read_log_a(){
     gnome-terminal -- bash -c "./ReadLog.sh -a -f $OPTION_FOLDER_PATH; exec bash"
 }
 
+cat_meow(){
+    clear
+    echo "
+        へ 
+     （• ˕ •マ  meow~
+       |､  ~ヽ         
+       じしf_,)〳
+    "    
+}
+
 while getopts $OPTIONS opts; do
     case $opts in
     \?)
@@ -79,6 +94,8 @@ done
 if [ $OPTION_TRUE -eq 0 ]; then
     clear
     echo "
+    start -main.sh-
+
         へ 
      （• ˕ •マ 
        |､  ~ヽ         
@@ -111,9 +128,13 @@ if [ $OPTION_TRUE -eq 0 ]; then
             echo " raen0730@gmail.com"
             exit 1
         ;;
+        cat)
+            cat_meow
+            exit 1
+        ;;
         * )
             echo "잘못된 입력입니다"
+            exit 1
         ;;
     esac
 fi
-#bash ./ReadLog.sh 

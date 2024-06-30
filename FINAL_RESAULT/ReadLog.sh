@@ -63,6 +63,9 @@ CHECK_ALL=false
 #알람 빈도
 ALARM_REPEAT=$(grep '^ALARM_REPEAT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
 
+#시간 필터 카운트
+TIME_FILTER_COUNT=$(grep '^TIME_FILTER_COUNT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+
 if [ -z "$ALARM_REPEAT" ]; then
     echo "알람 반복 변수가 비어있습니다. OPTION을 확인해주세요"
     exit 1
@@ -196,19 +199,16 @@ check_file_change(){
         fi
 
         #이미 지난 시간 제외하기 위한 로직
-        #echo "LOG TIME 위 : $LOG_TIME"
-        #echo "NEWLOG: $NEW_LOG"
         LOG_TIME+=$(echo "$NEW_LOG" | grep -oP '^\[\d+\]' | tr -d '[]' | sort -u | awk 'BEGIN{sep="|"} {printf "%s%s", sep, $0; sep="|"} END{print ""}')
-        #echo "LOG TIME 아래 : $LOG_TIME"
 
-        #시간 필터 - 필요시 카운트 수 바꾸면 됨, 혹시 몰라서 =이 아니라 -ge로 설정
-        if [ $TIME_FILTER_COUNTER -ge 10 ]; then
-            #echo "LOG TIME: $LOG_TIME"
+        #시간 필터 - 필요시 OPTION에서 변경 가능, 혹시 몰라서 =이 아니라 -ge로 설정
+        if [ $TIME_FILTER_COUNTER -ge $TIME_FILTER_COUNT ]; then
+            echo "로그 시간 필터 작동됨 : $TIME_FILTER_COUNTER"
+            #실행 되면 다시 0으로 리셋
+            TIME_FILTER_COUNTER=0
             EXIST_IN_LOG_TIME=$(head -n 1 "$LOG_FILE" | grep -oP '^\[\d+\]' | tr -d '[]')
-            #echo "exitst log time : $EXIST_IN_LOG_TIME"
             FILTERED_LOG=$(echo "$LOG_TIME" | tr '|' '\n' | awk -v filter="$EXIST_IN_LOG_TIME" '$1 >= filter' | tr '\n' '|' | sed 's/|$//' | sed 's/ $//')
-            #echo "FILTERED LOG : $FILTERED_LOG"
-            LOG_TIME=$FILTERED_LOG
+            LOG_TIME=$FILTERED_LOG  
         fi
     else
         echo "로그 변경사항 없음"

@@ -1,2 +1,3 @@
 *.log
-test.log
+/previous_ver
+/ARCHIVE
