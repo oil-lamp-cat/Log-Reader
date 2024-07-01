@@ -1,9 +1,14 @@
 #!/bin/bash
 
 #옵션
-OPTIONS="f:ah?"
+OPTIONS="f:ahk?"
 
 FOLDER=0
+
+KEYWORD=0
+
+#옵션 관련 -a
+CHECK_ALL=false
 
 OPTION_FOLDER_PATH="./OPTION"
 
@@ -31,6 +36,10 @@ while getopts $OPTIONS opts; do
     f)
         FOLDER=1
     ;;
+    k)
+        echo "키워드 설정"
+        KEYWORD=1
+    ;;
     h)
         usage
         exit 1
@@ -57,14 +66,18 @@ LOG_TIME="\*"
 #시간 제거 로직에 필요한 변경사항에 따른 횟수 - 과부화 방지용
 TIME_FILTER_COUNTER=0
 
-#옵션 관련 -a
-CHECK_ALL=false
-
 #알람 빈도
 ALARM_REPEAT=$(grep '^ALARM_REPEAT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
 
 #시간 필터 카운트
 TIME_FILTER_COUNT=$(grep '^TIME_FILTER_COUNT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+
+#키워드 기반 감지
+if [[ $KEYWORD = 0 ]]; then
+    WORD="\s"
+else
+    WORD=$(grep '^KEYWORD : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+fi
 
 if [ -z "$ALARM_REPEAT" ]; then
     echo "알람 반복 변수가 비어있습니다. OPTION을 확인해주세요"
@@ -112,19 +125,59 @@ sound_alarm() {
 
     while read -s -n 1 input
     do
-        if [[ $input = q ]]; then
-            if [[ $alarm_process_id != "" ]]; then
+        case "$input" in 
+            c)
+                if [ "$CHECK_ALL" = true ]; then
+                    CHECK_ALL=false
+                    echo "DOWN만 감지합니다"
+                else
+                    CHECK_ALL=true
+                    echo "DOWN과 CRITICAL을 감지합니다"
+                fi
+            ;;
+            h)
+                echo -e "\n==========추가기능==========\n"
+                echo " c - DOWN과 CRITICAL감지 모드 반전"
+                echo " k - 키워드 기반 감지 모드 반전"
+                echo " l - 지금까지의 DOWN과 CRITICAL 확인"
+                echo " s - 지금까지의 DOWN과 CRITICAL 저장"
+                echo -e "\n============================"
+            ;;
+            k) 
+                if [[ $KEYWORD = 1 ]]; then
+                    WORD="\s"
+                    echo "키워드 감지 NO"
+                    KEYWORD=0
+                else
+                    WORD=$(grep '^KEYWORD : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+                    echo "키워드 감지 YES"
+                    KEYWORD=1
+                fi
+            ;;
+            l)
+                gnome-terminal --tab -- bash -c "cat $LOG_FILE | grep -E 'DOWN|CRITICAL'; exec bash"
+            ;;
+            s)
+                DATE_TIME=$(date +"%Y%m%d_%H%M%S")
+                grep -E "DOWN|CRITICAL" mlat.log > SAVE_$DATE_TIME.txt
+                echo "SAVE_$DATE_TIME.txt 파일에 저장하였습니다"
+            ;;
+            q)
+                if [[ $alarm_process_id != "" ]]; then
+                    kill $alarm_process_id
+                fi
+                clear
+                break
+            ;;
+            m)
                 kill $alarm_process_id
-            fi
-            clear
-            break
-        elif [[ $input = m ]]; then
-            kill $alarm_process_id
-            alarm_process_id=""
-            echo "알람을 종료했습니다. q를 눌러 작업을 계속할 수 있습니다."
-        else
-            echo "$input 은(는) 잘못된 입력입니다."
-        fi
+                alarm_process_id=""
+                echo -e "\n알람을 종료했습니다. q를 눌러 작업을 계속할 수 있습니다."
+            ;;
+            *)
+                echo "$input 은(는) 잘못된 입력입니다."
+            ;;
+        esac
     done
 }
 
@@ -151,6 +204,14 @@ check_file_change(){
     CURRENT_DATE=$(date -r "$LOG_FILE")
     DATE=$(date +'%Y-%m-%d')
     TIME=$(date +'%H:%M:%S')
+    if [[ $CHECK_ALL = true ]]; then
+        echo "DOWN과 CRITICAL을 감지중입니다"
+    else
+        echo "DOWN만 감지중입니다"
+    fi
+    if [[ $KEYWORD = 1 ]]; then
+        echo "현재 설정된 키워드 : $WORD"
+    fi
     echo "현재 날짜: $DATE"
     echo "현재 시간: $TIME"
     if [ "$CURRENT_DATE" != "$PREVIOUS_DATE" ]; then
@@ -158,7 +219,7 @@ check_file_change(){
         TIME_FILTER_COUNTER=$((TIME_FILTER_COUNTER + 1))
         #시간 조정
         PREVIOUS_DATE=$CURRENT_DATE
-        NEW_LOG=$(grep -Ev "$LOG_TIME" "$LOG_FILE")
+        NEW_LOG=$(grep -Ev "$LOG_TIME" "$LOG_FILE" | grep -E $WORD )
 
         #NEW_LOG 존재 유무 확인
         if [[ -z "$NEW_LOG" ]]; then
@@ -178,7 +239,9 @@ check_file_change(){
                 echo -e "\n========= DOWN LOG =========\n"
                 echo -e "\n$ALL_LOG"
                 echo -e "\n============================"
-                echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
+                echo -e "\n h - 추가기능\n q - 알람 종료 \n m - 음속어"
+                echo -e "============================"
+                #echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
                 sound_alarm
             else
                 echo "DOWN및 CRITICAL 없음"
@@ -191,7 +254,8 @@ check_file_change(){
                 echo -e "\n========= DOWN LOG =========\n"
                 echo -e "\n$DOWN_LOG"
                 echo -e "\n============================"
-                echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
+                echo -e "\n h - 추가기능\n q - 알람 종료 \n m - 음속어\n"
+                echo -e "============================"
                 sound_alarm
             else
                 echo "DOWN 없음"

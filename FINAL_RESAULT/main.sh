@@ -10,8 +10,7 @@ if [ ! -f "$OPTION_FOLDER_PATH" ]; then
     clear
     echo "옵션 파일이 존재하지 않습니다."
     touch "$OPTION_FOLDER_PATH"
-    echo "
-#대괄호를 삭제하지 말고 안에 넣기!
+    echo "#대괄호를 삭제하지 말고 안에 넣기!
 #문제 발생시 : https://oil-lamp-cat.github.io/
 
 #이곳에 읽고자 하는 log의 위치를 넣으세요
@@ -30,6 +29,11 @@ RDLOG_REPEAT : [2]
 #검사시 로그에 삭제된 시간이 존재한다면 코드의 FILTER_LOG변수에서 그 시간대를 전부 삭제합니다
 #테스트 스크립트를 이용하였을 때에는 10회 정도가 적당하였으나 로그 읽는 빈도수, 실제 로그 생성 시간에 맞춰 알맞게 변경하시기 바랍니다
 TIME_FILTER_COUNT : [10]
+
+#특정 키워드가 포함된 로그 검출을 위한 옵션 -k를 이용할 때 사용됨
+#단어|단어 로 구성되어야함
+#아래는 기본 세팅
+KEYWORD : [CWP|FUSION]
     " > "$OPTION_FOLDER_PATH"
     echo "./OPTION 파일을 생성하였으니 확인하고 설정을 끝낸 뒤 다시 찾아와주세요~"
     exit 1
@@ -40,6 +44,8 @@ usage()
     echo '
     <options>
     -t : 테스트 스크립트 실행
+    -f : 폴더 선택
+    -k : 키워드 설정
     -h : 도움말
     '
 }
@@ -57,6 +63,10 @@ read_log_d(){
 
 read_log_a(){
     gnome-terminal -- bash -c "./ReadLog.sh -a -f $OPTION_FOLDER_PATH; exec bash"
+}
+
+keyword_read_log(){
+    gnome-terminal -- bash -c "./ReadLog.sh -a -k -f $OPTION_FOLDER_PATH; exec bash"
 }
 
 cat_meow(){
@@ -106,7 +116,8 @@ if [ $OPTION_TRUE -eq 0 ]; then
     1. 테스트 스크립트 실행 (MKlog.sh, ReadLog.sh) - 새로운 tab이 열릴 것입니다
     2. 로그 읽는 스크립트 실행 (ReadLog.sh) - DOWN만 감지
     3. 로그 읽는 스크립트 전체 감지 모드로 실행 (ReadLog.sh) - DOWN, CRITICAL 감지
-    4. 도움이 필요하다면 이곳으로
+    4. 특정 단어가 포함된 DOWN, CRITICAL 감지
+    5. 도움이 필요하다면 이곳으로
     "
     printf "$USER_ID@$HOST_NAME > "
     read task_input
@@ -122,10 +133,13 @@ if [ $OPTION_TRUE -eq 0 ]; then
             read_log_a
         ;;
         4)
-            echo -e "\n *blog*"
+            keyword_read_log
+        ;;
+        5)
+            echo -e "\n ====blog===="
             echo " https://oil-lamp-cat.github.io/"
-            echo -e "\n *email*"
-            echo " raen0730@gmail.com"
+            echo -e "\n ====email===="
+            echo -e " raen0730@gmail.com\n"
             exit 1
         ;;
         cat)
