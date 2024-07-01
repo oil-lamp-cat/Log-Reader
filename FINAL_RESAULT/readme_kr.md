@@ -24,7 +24,7 @@
 2. 확인하기 위해 `q`를 누를 때까지 알람을 계속 울립니다. 음소거의 경우 `m`을 누릅니다
 3. 그게 다예요!
 
-https://github.com/oil-lamp-cat/Log-Reader/assets/103806022/f56072cd-a305-4bb6-bd25-a536800f7d9c
+https://github.com/oil-lamp-cat/Log-Reader/assets/103806022/4b9d0259-d8a3-4629-8bc5-296701dc2366
 
 > OPTION에 관해
 
