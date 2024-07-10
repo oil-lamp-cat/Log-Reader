@@ -24,7 +24,7 @@ Once you run this script for the first time, you'll get a file called OPTION, wh
 2. Keep ringing the alarm until we press `q` to confirm, for mute press `m`
 3. And thats all!
 
-https://github.com/oil-lamp-cat/Log-Reader/assets/103806022/4b9d0259-d8a3-4629-8bc5-296701dc2366
+https://github.com/oil-lamp-cat/Log-Reader/assets/103806022/4c6c5716-ea6b-4719-8d39-9a9a553a711b
 
 > about OPTION
 
@@ -37,3 +37,9 @@ https://github.com/oil-lamp-cat/Log-Reader/assets/103806022/4b9d0259-d8a3-4629-8
 `RDLOG_REPEAT` : Check every **RDLOG_REPEAT**seconds to see if the log has changed
 
 `TIME_FILTER_COUNT` : Check log times after file changes are detected **TIME_FILTER_COUNT**
+
+`KEYWORD` : detect DOWN and CRITICAL by grep **KEYWORD**
+
+`ALARM_RUNNING_TIME` : Set to run for a specific time only, ex) H:M-H:M
+
+`NO_ALARM_RUNNING_TIME` : Set it to not run for a certain period of time, ex) H:M-H:M

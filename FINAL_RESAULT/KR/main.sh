@@ -46,11 +46,18 @@ change(){
         if [ "$OPTION_TYPE" = "LOG_PATH" ] || [ "$OPTION_TYPE" = "TEST_LOG_FILE" ] || [ "$OPTION_TYPE" = "ALARM_FILE" ]; then
             if ! [ -f "$CHANGE_TO" ]; then
                 option_setting "파일이 존재하지 않습니다."
+                return
+            fi
+        fi
+        if [ "$OPTION_TYPE" = "ALARM_FILE_ON_OFF" ]; then
+            if [ "$CHANGE_TO" != "ON" ] && [ "$CHANGE_TO" != "OFF" ]; then
+                option_setting "ALARM_FILE_ON_OFF 옵션은 ON 또는 OFF만 허용됩니다."
+                return
             fi
         fi
         case "$yn" in
         [yY])
-            sed -i "s/\($OPTION_TYPE : \[\)[^]]*\(\]\)/\1$(echo "$CHANGE_TO" | sed -e 's/[\/&]/\\&/g')\2/" "$OPTION_FILE"
+            sed -i "s/^\($OPTION_TYPE : \[\)[^]]*\(\]\)/\1$(echo "$CHANGE_TO" | sed -e 's/[\/&]/\\&/g')\2/" "$OPTION_FILE"
             option_setting "$OPTION_TYPE 의 $PREVIOUS 에서 $CHANGE_TO (으)로 변경되었습니다"
         ;;
         [nN])
@@ -70,28 +77,38 @@ option_setting(){
     local LOG_FILE=$(grep '^LOG_PATH : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
     local ALARM_REPEAT=$(grep '^ALARM_REPEAT : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
     local ALARM_FILE=$(grep '^ALARM_FILE : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
-    local ALARM_ON_OFF=$(grep '^ALARM_ON_OFF : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+    local ALARM_FILE_ON_OFF=$(grep '^ALARM_FILE_ON_OFF : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
     local TEST_LOG_FILE=$(grep '^TEST_LOG_FILE : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
     local TIME_FILTER_COUNT=$(grep '^TIME_FILTER_COUNT : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
     local WORD=$(grep '^KEYWORD : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
     local RDLOG_REPEAT=$(grep '^RDLOG_REPEAT : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
-    local RUNNING_TIME=$(grep '^RUNNING_TIME : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
-    local NO_RUNNING_TIME=$(grep '^NO_RUNNING_TIME : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+    local ALARM_RUNNING_TIME=$(grep '^ALARM_RUNNING_TIME : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+    local NO_ALARM_RUNNING_TIME=$(grep '^NO_ALARM_RUNNING_TIME : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+
+    if [ -z "$ALARM_RUNNING_TIME" ]; then
+        ALARM_RUNNING_TIME="EMPTY"
+    fi
+
+    if [ -z "$NO_ALARM_RUNNING_TIME" ]; then
+        NO_ALARM_RUNNING_TIME="EMPTY"
+    fi
+
+
     echo -e "\n 옵션 설정"
     echo "
     # 변경을 하고자 하는 숫자를 입력 하거나
-    # q를 눌러 다시 메인으로 가실 수 있습니다
+    # q를 눌러 메인으로 가실 수 있습니다
 
-    1.LOG_PATH : $LOG_FILE
-    2.TEST_LOG_FILE : $TEST_LOG_FILE
-    3.ALARM_REPEAT : $ALARM_REPEAT
-    4.ALARM_FILE : $ALARM_FILE
-    5.ALARM_ON_OFF : $ALARM_ON_OFF
-    6.RDLOG_REPEAT : $RDLOG_REPEAT
-    7.TIME_FILTER_COUNT : $TIME_FILTER_COUNT
-    8.KEYWORD : $WORD
-    9.RUNNING_TIME : $RUNNING_TIME
-    10.NO_RUNNING_TIME : $NO_RUNNING_TIME
+    1.LOG_PATH                | $LOG_FILE
+    2.TEST_LOG_FILE           | $TEST_LOG_FILE
+    3.ALARM_REPEAT            | $ALARM_REPEAT
+    4.ALARM_FILE              | $ALARM_FILE
+    5.ALARM_FILE_ON_OFF       | $ALARM_FILE_ON_OFF
+    6.RDLOG_REPEAT            | $RDLOG_REPEAT
+    7.TIME_FILTER_COUNT       | $TIME_FILTER_COUNT
+    8.KEYWORD                 | $WORD
+    9.ALARM_RUNNING_TIME      | $ALARM_RUNNING_TIME
+    10.NO_ALARM_RUNNING_TIME  | $NO_ALARM_RUNNING_TIME
     "
 
     if [ "$CHANGED_LOG" != "NONE" ]; then
@@ -129,18 +146,18 @@ option_setting(){
         4)
             clear
             echo " ALARM_FILE : $ALARM_FILE"
-            echo -e " 알람 파일입니다\n"
+            echo " 알람 파일입니다\n"
             printf "$USER_ID@$HOST_NAME> "
             read change
             change "ALARM_FILE" "$change" "$ALARM_FILE"            
         ;;
         5)
             clear
-            echo " ALARM_ON_OFF : $ALARM_ON_OFF"
-            echo -e " 알람 파일을 끄고 킬 수 있습니다, 스크립트 실행 중에도 안에서 변경 가능"
+            echo " ALARM_FILE_ON_OFF : $ALARM_FILE_ON_OFF"
+            echo -e " 알람 파일을 사용할 수 있습니다, 스크립트 실행 중에도 안에서 변경 가능, ex) ON/OFF\n"
             printf "$USER_ID@$HOST_NAME> "
             read change
-            change "ALARM_ON_OFF" "$change" "$ALARM_ON_OFF"   
+            change "ALARM_FILE_ON_OFF" "$change" "$ALARM_FILE_ON_OFF"   
         ;;
         6)
             clear
@@ -153,7 +170,8 @@ option_setting(){
         7)
             clear
             echo " TIME_FILTER_COUNT : $TIME_FILTER_COUNT"
-            echo -e " 시간 제외 필터 횟수입니다 - 기본 10회, 입력은 숫자만 입력해주세요"
+            echo " 시간 제외 필터 횟수입니다 - 기본 10회, 입력은 숫자만 입력해주세요"
+            echo -e "오버플로우 방지용도\n"
             printf "$USER_ID@$HOST_NAME> "
             read change
             change "TIME_FILTER_COUNT" "$change" "$TIME_FILTER_COUNT"
@@ -161,26 +179,28 @@ option_setting(){
         8)
             clear
             echo " KEYWORD : $WORD"
-            echo -e " 키워드 포함 로그 검출, 단어|단어 로 입력해 주세요"
+            echo -e " 키워드 포함 로그 검출, 단어|단어 로 입력해 주세요\n"
             printf "$USER_ID@$HOST_NAME> "
             read change
             change "KEYWORD" "$change" "$WORD"
         ;;
         9)
             clear
-            echo " RUNNING_TIME : $RUNNING_TIME"
-            echo -e " 특정 시간 동안에만 실행, 08:00-18:30 로 입력해 주세요"
+            echo " ALARM_RUNNING_TIME : $ALARM_RUNNING_TIME"
+            echo " 특정 시간 동안에만 실행, ex) 08:00-18:30 (대-소로 입력해 주세요)"
+            echo -e " 비워두시면 24시간 실행됩니다\n"
             printf "$USER_ID@$HOST_NAME> "
             read change
-            change "RUNNING_TIME" "$change" "$RUNNING_TIME"
+            change "ALARM_RUNNING_TIME" "$change" "$ALARM_RUNNING_TIME"
         ;;
         10)
             clear
-            echo "NO_RUNNING_TIME : $NO_RUNNING_TIME"
-            echo "특정 시간 동안 실행 안함, 08:00-18:30 로 입력해 주세요"
+            echo "NO_ALARM_RUNNING_TIME : $NO_ALARM_RUNNING_TIME"
+            echo " 특정 시간 동안 알람 실행 안함, ex) 08:00-18:30 (대-소로 입력해 주세요)"
+            echo -e " 비워두시면 24시간 실행됩니다\n"
             printf "$USER_ID@$HOST_NAME> "
             read change
-            change "NO_RUNNING_TIME" "$change" "$NO_RUNNING_TIME"
+            change "NO_ALARM_RUNNING_TIME" "$change" "$NO_ALARM_RUNNING_TIME"
         ;;
         q)
             echo "설정을 종료합니다"
@@ -227,6 +247,7 @@ main(){
         4. 특정 단어가 포함된 DOWN, CRITICAL 감지
         5. 옵션 설정
         6. 도움이 필요하다면 이곳으로
+        q. 종료
         "
         printf "$USER_ID@$HOST_NAME> "
         read task_input
@@ -256,6 +277,8 @@ main(){
             ;;
             q)
                 echo "종료합니다"
+                sleep 1
+                clear
                 exit 1
             ;;
             cat)
@@ -305,8 +328,8 @@ LOG_PATH : [./mlat.log]
 ALARM_REPEAT : [0.3]
 
 #알람 파일입니다 - OPTION 설정에서 on/off 할 수 있습니다
-ALARM_FILE : []
-ALARM_ON_OFF : [NO]
+ALARM_FILE : [./beep_alarm.wav]
+ALARM_FILE_ON_OFF : [OFF]
 
 #테스트 로그에 사용될 로그 파일 위치입니다, 테스트에 쓰고 싶은 로그 파일을 넣으시면 됩니다
 TEST_LOG_FILE : [./mlat.log]
@@ -325,10 +348,10 @@ TIME_FILTER_COUNT : [10]
 KEYWORD : [CWP|FUSION]
 
 #특정 시간 동안에만 실행될 수 있게 세팅 ex) H:M, [08:00-18:30]
-RUNNING_TIME : []
+ALARM_RUNNING_TIME : []
 
 #특정 시간 동안에는 실행되지 않게 세팅 ex) H:M, [08:00-18:30]
-NO_RUNNING_TIME : []
+NO_ALARM_RUNNING_TIME : []
     " > "$OPTION_FILE"
     echo "./OPTION 파일을 생성하였으니 옵션 세팅을 열겠습니다"
     sleep 2

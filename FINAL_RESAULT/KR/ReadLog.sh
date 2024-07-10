@@ -10,7 +10,7 @@ KEYWORD=0
 #옵션 관련 -a
 CHECK_ALL=false
 
-OPTION_FOLDER_PATH="./OPTION"
+OPTION_FILE="./OPTION"
 
 #사용법
 usage(){
@@ -47,16 +47,6 @@ while getopts $OPTIONS opts; do
     esac
 done
 
-# log 파일
-if [[ $FOLDER = 0 ]]; then
-    LOG_FILE="./NEW_LOG_FILE.log"
-else
-    LOG_FILE=$(grep '^LOG_PATH : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
-    if [ ! -f "$LOG_FILE" ]; then
-        echo "위치에 로그파일이 존재하지 않습니다, 다시 한번 확인해 주세요"
-        exit 1
-    fi
-fi
 #파일 변경 시간 초기화
 PREVIOUS_DATE=""
 
@@ -67,16 +57,38 @@ LOG_TIME="\*"
 TIME_FILTER_COUNTER=0
 
 #알람 빈도
-ALARM_REPEAT=$(grep '^ALARM_REPEAT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+ALARM_REPEAT=$(grep '^ALARM_REPEAT : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+
+#알람 파일 설정
+ALARM_FILE=$(grep '^ALARM_FILE : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+
+#알람 파일 사용 여부
+ALARM_FILE_ON_OFF=$(grep '^ALARM_FILE_ON_OFF : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
 
 #시간 필터 카운트
-TIME_FILTER_COUNT=$(grep '^TIME_FILTER_COUNT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+TIME_FILTER_COUNT=$(grep '^TIME_FILTER_COUNT : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+
+# log 파일
+if [[ $FOLDER = 0 ]]; then
+    LOG_FILE="./NEW_LOG_FILE.log"
+else
+    LOG_FILE=$(grep '^LOG_PATH : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+    if [ ! -f "$LOG_FILE" ]; then
+        echo "위치에 로그파일이 존재하지 않습니다, 다시 한번 확인해 주세요"
+        exit 1
+    else
+        #만약 로그 파일이 이미 존재한다면 새로운 로그만 가져오기 위한 로직
+        LOG_TIME+=$(cat $LOG_FILE | grep -oP '^\[\d+\]' | tr -d '[]' | sort -u | awk 'BEGIN{sep="|"} {printf "%s%s", sep, $0; sep="|"} END{print ""}')
+        echo "$LOG_TIME"
+        sleep 1
+    fi
+fi
 
 #키워드 기반 감지
 if [[ $KEYWORD = 0 ]]; then
     WORD="\s"
 else
-    WORD=$(grep '^KEYWORD : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+    WORD=$(grep '^KEYWORD : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
 fi
 
 if [ -z "$ALARM_REPEAT" ]; then
@@ -85,7 +97,7 @@ if [ -z "$ALARM_REPEAT" ]; then
 fi
 
 #로그 확인 빈도
-RDLOG_REPEAT=$(grep '^RDLOG_REPEAT : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+RDLOG_REPEAT=$(grep '^RDLOG_REPEAT : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
 
 if [ -z "$RDLOG_REPEAT" ]; then
     echo "로그 확인 빈도 변수가 비어있습니다. OPTION을 확인해주세요"
@@ -108,20 +120,93 @@ clear
 
 # 알람 출력
 alarm() {
-    while true
-    do 
-        printf '\a'
-        sleep $ALARM_REPEAT
-    done 
+    if [ "$ALARM_FILE_ON_OFF" = "ON" ]; then
+        while true
+            do 
+                aplay $ALARM_FILE
+        done >/dev/null 2>&1
+    else
+        while true
+            do 
+                printf '\a'
+                sleep $ALARM_REPEAT
+        done 
+    fi
+}
+
+time_limit_check(){
+#실행 시간 제한
+    ALARM_RUNNING_TIME=$(grep '^ALARM_RUNNING_TIME : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+
+    if [ -n "$ALARM_RUNNING_TIME" ]; then
+        RUNNING_START_TIME=$(echo $ALARM_RUNNING_TIME | cut -d'-' -f1 | sed 's/://')
+        RUNNING_END_TIME=$(echo $ALARM_RUNNING_TIME | cut -d'-' -f2 | sed 's/://')
+    
+    fi
+
+    #정지 시간 제한
+    NO_ALARM_RUNNING_TIME=$(grep '^NO_ALARM_RUNNING_TIME : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
+
+    if [ -n "$NO_ALARM_RUNNING_TIME" ]; then
+        NO_RUNNING_START_TIME=$(echo $NO_ALARM_RUNNING_TIME | cut -d'-' -f1 | sed 's/://')
+        NO_RUNNING_END_TIME=$(echo $NO_ALARM_RUNNING_TIME | cut -d'-' -f2 | sed 's/://')
+    fi
+
+    #현재 시간
+    CURRENT_TIME=$(date +%H%M)
+
+    if [ -n "$ALARM_RUNNING_TIME" ] && [ -n "$NO_ALARM_RUNNING_TIME" ]; then
+        if [ "$CURRENT_TIME" -ge "$RUNNING_START_TIME" ] && [ "$CURRENT_TIME" -le "$RUNNING_END_TIME" ] && 
+           ! ([ "$CURRENT_TIME" -ge "$NO_RUNNING_START_TIME" ] && [ "$CURRENT_TIME" -le "$NO_RUNNING_END_TIME" ]); then
+            return 1
+        else
+            echo "현재 시간은 알람이 종료되어있습니다"
+            return 0
+        fi
+
+    # ALARM_RUNNING_TIME만 존재하는 경우
+    elif [ -n "$ALARM_RUNNING_TIME" ]; then
+        if [ "$CURRENT_TIME" -ge "$RUNNING_START_TIME" ] && [ "$CURRENT_TIME" -le "$RUNNING_END_TIME" ]; then
+            return 1
+        else
+            echo "현재 시간은 알람이 종료되어있습니다"
+            return 0
+        fi
+
+    # NO_ALARM_RUNNING_TIME만 존재하는 경우
+    elif [ -n "$NO_ALARM_RUNNING_TIME" ]; then
+        if ! ([ "$CURRENT_TIME" -ge "$NO_RUNNING_START_TIME" ] && [ "$CURRENT_TIME" -le "$NO_RUNNING_END_TIME" ]); then
+            return 1
+        else
+            echo "현재 시간은 알람이 종료되어있습니다"
+            return 0
+        fi
+
+    # ALARM_RUNNING_TIME과 NO_ALARM_RUNNING_TIME이 모두 없는 경우
+    else
+        return 1
+    fi
 }
 
 # 소리 알람 함수
 sound_alarm() {
-    # alarm 함수 백그라운드 실행
-    alarm &
+    
+    #alarm 실행할지 여부
+    time_limit_check
+    limit=$?
 
-    # alarm 함수 프로세스 ID 저장
-    local alarm_process_id=$! # 지역변수로 설정
+    if [ "$limit" -eq 1 ]; then
+        echo -e "\n h - 추가기능\n q - 알람 종료 \n m - 음속어\n"
+        echo -e "============================"
+        # alarm 함수 백그라운드 실행
+        alarm &
+        # alarm 함수 프로세스 ID 저장
+        local alarm_process_id=""
+        alarm_process_id=$! # 지역변수로 설정
+    else
+        echo -e "\n h - 추가기능\n q - 알람 종료 \n m - 알람 실행 시간이 아닙니다\n"
+        echo -e "============================"
+    fi
 
     while read -s -n 1 input
     do
@@ -140,6 +225,7 @@ sound_alarm() {
                 echo " c - DOWN과 CRITICAL감지 모드 반전"
                 echo " k - 키워드 기반 감지 모드 반전"
                 echo " l - 지금까지의 DOWN과 CRITICAL 확인"
+                echo " o - 소리 ON/OFF 변경"
                 echo " s - 지금까지의 DOWN과 CRITICAL 저장"
                 echo -e "\n============================"
             ;;
@@ -149,13 +235,22 @@ sound_alarm() {
                     echo "키워드 감지 NO"
                     KEYWORD=0
                 else
-                    WORD=$(grep '^KEYWORD : \[.*\]$' "$OPTION_FOLDER_PATH" | awk -F '[][]' '{print $2}')
+                    WORD=$(grep '^KEYWORD : \[.*\]$' "$OPTION_FILE" | awk -F '[][]' '{print $2}')
                     echo "키워드 감지 YES"
                     KEYWORD=1
                 fi
             ;;
             l)
                 gnome-terminal --tab -- bash -c "cat $LOG_FILE | grep -E 'DOWN|CRITICAL'; exec bash"
+            ;;
+            o)
+                if [ "$ALARM_FILE_ON_OFF" = "ON" ]; then
+                        ALARM_FILE_ON_OFF="OFF"
+                        echo "비프음으로 소리를 냅니다"
+                else
+                    ALARM_FILE_ON_OFF="ON"
+                    echo "ALARM 파일으로 소리를 냅니다"
+                fi
             ;;
             s)
                 DATE_TIME=$(date +"%Y%m%d_%H%M%S")
@@ -170,9 +265,14 @@ sound_alarm() {
                 break
             ;;
             m)
-                kill $alarm_process_id
+                if [[ $alarm_process_id != "" ]]; then
+                    kill $alarm_process_id
+                    echo -e "\n알람을 종료했습니다. q를 눌러 작업을 계속할 수 있습니다."
+                else
+                    echo -e "\n이미 mute되어있습니다. q를 눌러 작업을 계속할 수 있습니다."
+                fi
                 alarm_process_id=""
-                echo -e "\n알람을 종료했습니다. q를 눌러 작업을 계속할 수 있습니다."
+                
             ;;
             *)
                 echo "$input 은(는) 잘못된 입력입니다."
@@ -239,9 +339,6 @@ check_file_change(){
                 echo -e "\n========= DOWN LOG =========\n"
                 echo -e "\n$ALL_LOG"
                 echo -e "\n============================"
-                echo -e "\n h - 추가기능\n q - 알람 종료 \n m - 음속어"
-                echo -e "============================"
-                #echo -e "\n알람을 종료하기 위해 q를 음속어를 위해서는 m을 누르세요"
                 sound_alarm
             else
                 echo "DOWN및 CRITICAL 없음"
@@ -254,8 +351,6 @@ check_file_change(){
                 echo -e "\n========= DOWN LOG =========\n"
                 echo -e "\n$DOWN_LOG"
                 echo -e "\n============================"
-                echo -e "\n h - 추가기능\n q - 알람 종료 \n m - 음속어\n"
-                echo -e "============================"
                 sound_alarm
             else
                 echo "DOWN 없음"
@@ -285,4 +380,6 @@ do
     check_file_change
     sleep $RDLOG_REPEAT
     clear
+    
+
 done
